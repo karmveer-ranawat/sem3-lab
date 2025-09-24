@@ -1,51 +1,43 @@
 import random
+import time
+from threading import Thread, Lock
+
+# Number of processes in the ring
+num_processes = 5
 
 class Process:
     def __init__(self, pid):
         self.pid = pid
-        self.active = True
+        self.is_leader = False
+        self.lock = Lock()
 
-    def __repr__(self):
-        return f"P{self.pid}{' (inactive)' if not self.active else ''}"
+    def run(self):
+        # Simulate some work
+        time.sleep(random.uniform(0.1, 0.5))
 
+        # Pass a message to the next process in the ring
+        next_process = (self.pid + 1) % num_processes
+        with processes[next_process].lock:
+            if not processes[next_process].is_leader:
+                print(f"Process {self.pid} sends a message to Process {next_process}")
 
-def ring_election(processes, initiator_id):
-    n = len(processes)
-    initiator = processes[initiator_id]
+            # Check if we should become the leader
+            if self.pid == max([p.pid for p in processes]):
+                self.is_leader = True
+                print(f"Process {self.pid} becomes the leader")
 
-    if not initiator.active:
-        print(f"Process {initiator.pid} is inactive and cannot initiate election.")
-        return None
+# Create a list of processes
+processes = [Process(pid) for pid in range(num_processes)]
 
-    print(f"\nElection initiated by Process {initiator.pid}")
+# Start threads for each process
+threads = [Thread(target=process.run) for process in processes]
+for thread in threads:
+    thread.start()
 
-    # Election message will circulate the ring
-    message = [initiator.pid]
-    current = (initiator_id + 1) % n
+# Wait for all threads to finish
+for thread in threads:
+    thread.join()
 
-    while current != initiator_id:
-        if processes[current].active:
-            message.append(processes[current].pid)
-            print(f"Process {processes[current].pid} passes election message.")
-        current = (current + 1) % n
-
-    # The process with the highest ID wins
-    leader = max(message)
-    print(f"Processes in election: {message}")
-    print(f"Leader elected: Process {leader}\n")
-
-    return leader
-
-
-# Example usage
-if __name__ == "__main__":
-    # Create 5 processes
-    processes = [Process(i) for i in range(5)]
-
-    # Randomly deactivate one process
-    processes[random.randint(0, 4)].active = False
-
-    print("Initial Processes:", processes)
-
-    # Start an election from process 2
-    leader = ring_election(processes, initiator_id=2)
+# Find the leader
+leader = [p for p in processes if p.is_leader][0]
+print(f"Leader elected: Process {leader.pid}")
